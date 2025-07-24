@@ -22,7 +22,7 @@ import redis from 'redis';
 dotenv.config();
 
 // Redis client instance
-var rc = redis.createClient();
+const rc = redis.createClient();
 
 // Tool definitions
 const SCRAPE_TOOL: Tool = {

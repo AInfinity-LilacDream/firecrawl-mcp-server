@@ -17,8 +17,12 @@ import FirecrawlApp, {
 
 import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
+import redis from 'redis';
 
 dotenv.config();
+
+// Redis client instance
+var rc = redis.createClient();
 
 // Tool definitions
 const SCRAPE_TOOL: Tool = {
@@ -1160,6 +1164,14 @@ ${
           throw new Error('Invalid arguments for firecrawl_search');
         }
         try {
+          const cached_result = rc.get(args.query);
+          if (cached_result != null) {
+            return {
+              content: [{ type: 'text', text: cached_result }],
+              isError: false,
+              isCached: true,
+            };
+          }
           const response = await withRetry(
             async () =>
               client.search(args.query, { ...args, origin: 'mcp-server' }),
@@ -1183,9 +1195,12 @@ ${result.markdown ? `\nContent:\n${result.markdown}` : ''}`
             )
             .join('\n\n');
 
+          rc.set(args.query, trimResponseText(results));
+
           return {
             content: [{ type: 'text', text: trimResponseText(results) }],
             isError: false,
+            isCached: false,
           };
         } catch (error) {
           const errorMessage =
@@ -1474,6 +1489,8 @@ function trimResponseText(text: string): string {
 // Server startup
 async function runLocalServer() {
   try {
+
+    console.error('redis version');
     console.error('Initializing Firecrawl MCP Server...');
 
     const transport = new StdioServerTransport();
